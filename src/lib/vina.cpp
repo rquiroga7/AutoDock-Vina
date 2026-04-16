@@ -285,32 +285,33 @@ void Vina::set_forcefield() {
 }
 
 std::vector<double> Vina::grid_dimensions_from_ligand(double buffer_size) {
+	// Use min/max bounding-box semantics for autobox: compute min and max
+	// coordinates across movable ligand atoms, add buffer on each side,
+	// and ceil the resulting sizes (as previous autobox ceil logic did).
 	std::vector<double> box_dimensions(6, 0);
-	std::vector<double> box_center(3, 0);
-	std::vector<double> max_distance(3, 0);
 
-	// The center of the ligand will be the center of the box
-	box_center = m_model.center();
+	// initialize mins and maxs
+	const double INF = 1e300;
+	double minc[3] = { INF, INF, INF };
+	double maxc[3] = { -INF, -INF, -INF };
 
-	// Get the furthest atom coordinates from the center in each dimensions
 	VINA_FOR(i, m_model.num_movable_atoms()) {
-		const vec& atom_coords = m_model.get_coords(i);
-
-		VINA_FOR_IN(j, atom_coords) {
-			double distance = std::fabs(box_center[j] - atom_coords[j]);
-
-			if (max_distance[j] < distance)
-				max_distance[j] = distance;
+		const vec& c = m_model.get_coords(i);
+		VINA_FOR_IN(j, c) {
+			if (c[j] < minc[j]) minc[j] = c[j];
+			if (c[j] > maxc[j]) maxc[j] = c[j];
 		}
 	}
 
-	// Get the final dimensions of the box
-	box_dimensions[0] = box_center[0];
-	box_dimensions[1] = box_center[1];
-	box_dimensions[2] = box_center[2];
-	box_dimensions[3] = std::ceil((max_distance[0] + buffer_size) * 2);
-	box_dimensions[4] = std::ceil((max_distance[1] + buffer_size) * 2);
-	box_dimensions[5] = std::ceil((max_distance[2] + buffer_size) * 2);
+	// center is midpoint of min and max
+	box_dimensions[0] = (minc[0] + maxc[0]) / 2.0;
+	box_dimensions[1] = (minc[1] + maxc[1]) / 2.0;
+	box_dimensions[2] = (minc[2] + maxc[2]) / 2.0;
+
+	// sizes: (max - min) + 2*buffer (bounding-box semantics, no rounding)
+	box_dimensions[3] = (maxc[0] - minc[0]) + 2.0 * buffer_size;
+	box_dimensions[4] = (maxc[1] - minc[1]) + 2.0 * buffer_size;
+	box_dimensions[5] = (maxc[2] - minc[2]) + 2.0 * buffer_size;
 
 	return box_dimensions;
 }
@@ -359,6 +360,14 @@ void Vina::compute_vina_maps(double center_x, double center_y, double center_z, 
 		gd[i].end = gd[i].begin + real_span;
 	}
 
+	// Debug: print voxel/grid extents
+	if (m_verbosity > 0) {
+		std::cout << "Grid voxels: X " << gd[0].n_voxels << " Y " << gd[1].n_voxels << " Z " << gd[2].n_voxels << "\n";
+		std::cout << "Grid begin: X " << gd[0].begin << " Y " << gd[1].begin << " Z " << gd[2].begin << "\n";
+		std::cout << "Grid end  : X " << gd[0].end << " Y " << gd[1].end << " Z " << gd[2].end << "\n";
+		std::cout << "Grid spacing: " << granularity << "\n";
+	}
+
 	// Initialize the scoring function
 	precalculate precalculated_sf(*m_scoring_function);
 	// Store it now in Vina object because of non_cache
@@ -372,6 +381,14 @@ void Vina::compute_vina_maps(double center_x, double center_y, double center_z, 
 	// Compute the Vina grids
 	cache grid(gd, slope);
 	grid.populate(m_model, precalculated_sf, atom_types);
+
+	// Debug: after population show exact corner coordinates
+	if (m_verbosity > 0) {
+		vec c1 = grid.corner1();
+		vec c2 = grid.corner2();
+		std::cout << "Grid corner1: X " << c1[0] << " Y " << c1[1] << " Z " << c1[2] << "\n";
+		std::cout << "Grid corner2: X " << c2[0] << " Y " << c2[1] << " Z " << c2[2] << "\n";
+	}
 
 	done(m_verbosity, 0);
 

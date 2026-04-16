@@ -429,6 +429,10 @@ Thank you!\n";
 					// In the case users ask for score and local only with the autobox arg, we compute the optimal box size for it/them.
 					if (autobox) {
 						std::vector<double> dim = v.grid_dimensions_from_ligand(autobox_add);
+						// Debugging output: print numeric center and sizes computed by autobox
+						std::cout << "Autobox computed grid center: X " << dim[0] << " Y " << dim[1] << " Z " << dim[2] << "\n";
+						std::cout << "Autobox computed ligand size: X " << (dim[3] - 2.0 * autobox_add) << " Y " << (dim[4] - 2.0 * autobox_add) << " Z " << (dim[5] - 2.0 * autobox_add) << "\n";
+						std::cout << "Autobox final grid size: X " << dim[3] << " Y " << dim[4] << " Z " << dim[5] << " (autobox_add " << autobox_add << ")\n";
 						v.compute_vina_maps(dim[0], dim[1], dim[2], dim[3], dim[4], dim[5], grid_spacing, force_even_voxels);
 					} else {
 						v.compute_vina_maps(center_x, center_y, center_z, size_x, size_y, size_z, grid_spacing, force_even_voxels);

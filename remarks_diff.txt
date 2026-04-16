@@ -1,0 +1,21 @@
+--- /home/rquiroga/github/AutoDock-Vina/autobox_remarks.txt	2026-04-16 13:25:01.560275650 -0300
++++ /home/rquiroga/github/AutoDock-Vina/explicit_remarks.txt	2026-04-16 13:25:01.562275654 -0300
+@@ -1,9 +1,9 @@
+-REMARK VINA RESULT:    -8.018      0.000      0.000
+-REMARK VINA RESULT:    -7.832      0.616      1.825
+-REMARK VINA RESULT:    -7.778      1.684      2.253
+-REMARK VINA RESULT:    -7.754      1.882      3.082
+-REMARK VINA RESULT:    -7.711      2.649      8.802
+-REMARK VINA RESULT:    -7.681      2.672      8.938
+-REMARK VINA RESULT:    -7.517      2.551      2.995
+-REMARK VINA RESULT:    -7.329      3.437      4.613
+-REMARK VINA RESULT:    -7.265      2.983      8.791
++REMARK VINA RESULT:    -8.229      0.000      0.000
++REMARK VINA RESULT:    -8.114      0.415      1.757
++REMARK VINA RESULT:    -7.882      1.269      2.580
++REMARK VINA RESULT:    -7.761      1.766      2.929
++REMARK VINA RESULT:    -7.756      2.621      8.782
++REMARK VINA RESULT:    -7.622      1.370      2.042
++REMARK VINA RESULT:    -7.537      2.695      8.846
++REMARK VINA RESULT:    -7.400      2.807      8.794
++REMARK VINA RESULT:    -7.317      2.563      8.505

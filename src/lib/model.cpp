@@ -452,17 +452,7 @@ void model::assign_types() {
 			case EL_TYPE_SIZE : break;
 			default: VINA_CHECK(false);
 		}
-		// DEBUG: print XS type for ligand atoms only
-		if(!ai.in_grid && a.el != EL_TYPE_H) {
-			const char* xs_names[] = {"C_H","C_P","N_P","N_D","N_A","N_DA","O_P","O_D","O_A","O_DA","S_P","P_P","F_H","Cl_H","Br_H","I_H","Si","At","Met_D","C_H_CG0","C_P_CG0","G0","C_H_CG1","C_P_CG1","G1","C_H_CG2","C_P_CG2","G2","C_H_CG3","C_P_CG3","G3","W"};
-			fprintf(stderr, "VINA_XS: atom[%zu] ad=%d xs=%s het=%d bonds=[", ai.i, (int)a.ad, (x < 32 ? xs_names[x] : "?"), het);
-			VINA_FOR_IN(bi, a.bonds) {
-				const bond& b = a.bonds[bi];
-				const atom& nb = get_atom(b.connected_atom_index);
-				fprintf(stderr, "%d(ad%d) ", (int)(b.connected_atom_index.in_grid ? -1 : (int)b.connected_atom_index.i), (int)nb.ad);
-			}
-			fprintf(stderr, "]\n");
-		}
+		// (removed debug XS printing)
 	}
 }
 
@@ -965,24 +955,6 @@ fl model::evali(const precalculate_byatom& p, const vec& v) const { // clean up
 	fl e = 0;
 	VINA_FOR_IN(i, ligands) {
 		e += eval_interacting_pairs(p, v[0], ligands[i].pairs, coords); // probably might was well use coords here
-		// DEBUG: print intra pair details
-		{
-			fl cutoff_sqr = p.cutoff_sqr();
-			std::cerr << "INTRA_DEBUG: ligand " << i << " num_pairs=" << ligands[i].pairs.size() << " v[0]=" << v[0] << std::endl;
-			VINA_FOR_IN(j, ligands[i].pairs) {
-				const interacting_pair& ip = ligands[i].pairs[j];
-				fl r2 = vec_distance_sqr(coords[ip.a], coords[ip.b]);
-				if (r2 < cutoff_sqr) {
-					fl r = std::sqrt(r2);
-					fl tmp = p.eval_fast(ip.a, ip.b, r2);
-					fl raw = tmp;
-					curl(tmp, v[0]);
-					std::cerr << "INTRA_PAIR: " << ip.a << " " << ip.b
-					          << " xs=" << atoms[ip.a].xs << "," << atoms[ip.b].xs
-					          << " r=" << r << " raw=" << raw << " curled=" << tmp << std::endl;
-				}
-			}
-		}
 	}
 	return e;
 }

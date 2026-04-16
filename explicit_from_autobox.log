@@ -1,0 +1,54 @@
+AutoDock Vina 6f1294b-mod
+#################################################################
+# If you used AutoDock Vina in your work, please cite:          #
+#                                                               #
+# J. Eberhardt, D. Santos-Martins, A. F. Tillack, and S. Forli  #
+# AutoDock Vina 1.2.0: New Docking Methods, Expanded Force      #
+# Field, and Python Bindings, J. Chem. Inf. Model. (2021)       #
+# DOI 10.1021/acs.jcim.1c00203                                  #
+#                                                               #
+# O. Trott, A. J. Olson,                                        #
+# AutoDock Vina: improving the speed and accuracy of docking    #
+# with a new scoring function, efficient optimization and       #
+# multithreading, J. Comp. Chem. (2010)                         #
+# DOI 10.1002/jcc.21334                                         #
+#                                                               #
+# Please see https://github.com/ccsb-scripps/AutoDock-Vina for  #
+# more information.                                             #
+#################################################################
+
+Scoring function : vina
+Rigid receptor: /home/rquiroga/github/AutoDock-Vina/1G9V_RQ3_protein.pdbqt
+Ligand: /home/rquiroga/github/AutoDock-Vina/1G9V_RQ3_ligand_clean.pdbqt
+Grid center: X 16.688 Y 16.5415 Z 41.621
+Grid size  : X 12.77 Y 21.331 Z 14.804
+Grid space : 0.375
+Exhaustiveness: 8
+CPU: 0
+Verbosity: 1
+
+Grid voxels: X 35 Y 57 Z 40
+Grid begin: X 10.1255 Y 5.854 Z 34.121
+Grid end  : X 23.2505 Y 27.229 Z 49.121
+Grid spacing: 0.375
+Computing Vina grid ... Grid corner1: X 10.1255 Y 5.854 Z 34.121
+Grid corner2: X 23.2505 Y 27.229 Z 49.121
+done.
+WARNING: At low exhaustiveness, it may be impossible to utilize all CPUs.
+Performing docking (random seed: 42) ... 
+0%   10   20   30   40   50   60   70   80   90   100%
+|----|----|----|----|----|----|----|----|----|----|
+***************************************************
+
+mode |   affinity | dist from best mode
+     | (kcal/mol) | rmsd l.b.| rmsd u.b.
+-----+------------+----------+----------
+   1       -8.229          0          0
+   2       -8.114     0.4152      1.757
+   3       -7.882      1.269       2.58
+   4       -7.761      1.766      2.929
+   5       -7.756      2.621      8.782
+   6       -7.622       1.37      2.042
+   7       -7.537      2.695      8.846
+   8         -7.4      2.807      8.794
+   9       -7.317      2.563      8.505
