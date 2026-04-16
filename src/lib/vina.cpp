@@ -685,6 +685,18 @@ void Vina::show_score(const std::vector<double> energies) {
 	} else {
 		std::cout << "(4) Unbound System's Energy [=(2)] : " << std::fixed << std::setprecision(3) << energies[7] << " (kcal/mol)\n";
 	}
+	
+	// Verbose output - show individual energy terms
+	if (m_verbose && (m_sf_choice == SF_VINA || m_sf_choice == SF_VINARDO)) {
+		std::cout << "\nIntermolecular Energy Terms (Ligand-Receptor + Ligand-Flex):\n";
+		std::cout << "  Repulsion  : " << std::fixed << std::setprecision(3) << energies[9] << " (kcal/mol)\n";
+		std::cout << "  Gauss1     : " << std::fixed << std::setprecision(3) << energies[10] << " (kcal/mol)\n";
+		std::cout << "  Gauss2     : " << std::fixed << std::setprecision(3) << energies[11] << " (kcal/mol)\n";
+		std::cout << "  Hydrophobic: " << std::fixed << std::setprecision(3) << energies[12] << " (kcal/mol)\n";
+		std::cout << "  H-Bond     : " << std::fixed << std::setprecision(3) << energies[13] << " (kcal/mol)\n";
+		std::cout << "  Glue       : " << std::fixed << std::setprecision(3) << energies[8] << " (kcal/mol)\n";
+		std::cout << "  Sum        : " << std::fixed << std::setprecision(3) << energies[9] + energies[10] + energies[11] + energies[12] + energies[13] + energies[8] << " (kcal/mol)\n";
+	}
 }
 
 std::vector<double> Vina::score(double intramolecular_energy) {
@@ -701,6 +713,7 @@ std::vector<double> Vina::score(double intramolecular_energy) {
 	double intra_pairs = 0;
 	const vec authentic_v(1000, 1000, 1000);
 	std::vector<double> energies;
+	std::vector<double> verbose_terms;
 
 	if (m_sf_choice == SF_VINA || m_sf_choice == SF_VINARDO) {
 		// Inter
@@ -723,6 +736,15 @@ std::vector<double> Vina::score(double intramolecular_energy) {
 		total = m_scoring_function->conf_independent(m_model, inter + intra - intramolecular_energy); // we pass intermolecular energy from the best pose
 		// Torsion, we want to know how much torsion penalty was added to the total energy
 		conf_independent = total - (inter + intra - intramolecular_energy);
+
+		// Verbose mode: calculate individual energy terms for all intermolecular interactions
+		if (m_verbose && m_receptor_initialized) {
+			// Use explicit atom-atom evaluation for verbose output
+			verbose_terms = m_model.eval_all_inter_verbose(*m_scoring_function, m_non_cache, authentic_v);
+		} else if (m_verbose) {
+			// Fallback to inter_pairs only if no receptor
+			verbose_terms = m_model.eval_inter_verbose(*m_scoring_function, authentic_v);
+		}
 	} else {
 		// Inter
 		lig_grids = m_ad4grid.eval(m_model, authentic_v[1]); // [1] ligand -- grid
@@ -749,6 +771,29 @@ std::vector<double> Vina::score(double intramolecular_energy) {
 
 	if (m_sf_choice == SF_VINA  || m_sf_choice == SF_VINARDO) {
 		energies.push_back(intramolecular_energy);
+		// Add verbose terms if enabled
+		if (m_verbose && !verbose_terms.empty()) {
+			// Map potential indices to output order: repulsion, gauss1, gauss2, hydrophobic, hbond
+			// Vina potentials: 0=gauss1, 1=gauss2, 2=repulsion, 3=hydrophobic, 4=hbond, 5=glue
+			// Vinardo potentials: 0=gauss1, 1=repulsion, 2=hydrophobic, 3=hbond, 4=glue
+			if (m_sf_choice == SF_VINA) {
+				verbose_terms.push_back(verbose_terms[2]); // repulsion
+				verbose_terms.push_back(verbose_terms[0]); // gauss1
+				verbose_terms.push_back(verbose_terms[1]); // gauss2
+				verbose_terms.push_back(verbose_terms[3]); // hydrophobic
+				verbose_terms.push_back(verbose_terms[4]); // hbond
+			} else { // SF_VINARDO
+				verbose_terms.push_back(verbose_terms[1]); // repulsion
+				verbose_terms.push_back(verbose_terms[0]); // gauss1
+				verbose_terms.push_back(0.0);              // gauss2 (not in Vinardo)
+				verbose_terms.push_back(verbose_terms[2]); // hydrophobic
+				verbose_terms.push_back(verbose_terms[3]); // hbond
+			}
+			// Add the remapped terms to energies
+			for (sz i = 5; i < verbose_terms.size(); ++i) {
+				energies.push_back(verbose_terms[i]);
+			}
+		}
 	} else {
 		energies.push_back(intra);
 	}

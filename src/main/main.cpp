@@ -131,11 +131,12 @@ Thank you!\n";
 		int exhaustiveness = 8;
 		int max_evals = 0;
 		int verbosity = 1;
+		bool verbose = false;
 		int num_modes = 9;
 		double min_rmsd = 1.0;
 		double energy_range = 3.0;
 		double grid_spacing = 0.375;
-		double buffer_size = 4;
+		double autobox_add = 10;
 		double unbound_energy = NAN;
 
 		// autodock4.2 weights
@@ -193,7 +194,8 @@ Thank you!\n";
 			("size_x", value<double>(&size_x), "size in the X dimension (Angstrom)")
 			("size_y", value<double>(&size_y), "size in the Y dimension (Angstrom)")
 			("size_z", value<double>(&size_z), "size in the Z dimension (Angstrom)")
-			("autobox", bool_switch(&autobox), "set maps dimensions based on input ligand(s) (for --score_only and --local_only)")
+			("autobox", bool_switch(&autobox), "set maps dimensions based on input ligand(s) (use ligand bounding box to set grid)")
+			("autobox_add", value<double>(&autobox_add)->default_value(10), "size to add on each side of ligand box (Angstrom) when using --autobox")
 		;
 		//options_description outputs("Output prefixes (optional - by default, input names are stripped of .pdbqt\nare used as prefixes. _001.pdbqt, _002.pdbqt, etc. are appended to the prefixes to produce the output names");
 		options_description outputs("Output (optional)");
@@ -243,6 +245,7 @@ Thank you!\n";
 			("energy_range", value<double>(&energy_range)->default_value(3.0), "maximum energy difference between the best binding mode and the worst one displayed (kcal/mol)")
 			("spacing", value<double>(&grid_spacing)->default_value(0.375), "grid spacing (Angstrom)")
 			("verbosity", value<int>(&verbosity)->default_value(1), "verbosity (0=no output, 1=normal, 2=verbose)")
+			("verbose", bool_switch(&verbose), "output individual energy terms (repulsion, gauss1, gauss2, hydrophobic, hbond)")
 		;
 		options_description config("Configuration file (optional)");
 		config.add_options()
@@ -379,7 +382,7 @@ Thank you!\n";
 				std::cout << "Grid space : " << grid_spacing << "\n";
 			} else if (autobox) {
 				std::cout << "Grid center: ligand center (autobox)\n";
-				std::cout << "Grid size  : ligand size + " << buffer_size << " A in each dimension (autobox)\n";
+				std::cout << "Grid size  : ligand size + " << autobox_add << " A in each dimension (autobox)\n";
 				std::cout << "Grid space : " << grid_spacing << "\n";
 			}
 			std::cout << "Exhaustiveness: " << exhaustiveness << "\n";
@@ -390,7 +393,7 @@ Thank you!\n";
 			std::cout << "\n";
 		}
 
-		Vina v(sf_name, cpu, seed, verbosity, no_refine);
+		Vina v(sf_name, cpu, seed, verbosity, no_refine, verbose);
 
 		// rigid_name variable can be ignored for AD4
 		if (vm.count("receptor") || vm.count("flex"))
@@ -424,8 +427,8 @@ Thank you!\n";
 				} else {
 					// Will compute maps only for Vina atom types in the ligand(s)
 					// In the case users ask for score and local only with the autobox arg, we compute the optimal box size for it/them.
-					if ((score_only || local_only) && autobox) {
-						std::vector<double> dim = v.grid_dimensions_from_ligand(buffer_size);
+					if (autobox) {
+						std::vector<double> dim = v.grid_dimensions_from_ligand(autobox_add);
 						v.compute_vina_maps(dim[0], dim[1], dim[2], dim[3], dim[4], dim[5], grid_spacing, force_even_voxels);
 					} else {
 						v.compute_vina_maps(center_x, center_y, center_z, size_x, size_y, size_z, grid_spacing, force_even_voxels);

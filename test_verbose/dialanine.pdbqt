@@ -1,0 +1,13 @@
+REMARK Di-alanine peptide
+ATOM      1  N   ALA A   1      -0.000   0.000   0.000  1.00  0.00           N  
+ATOM      2  CA  ALA A   1       1.458   0.000   0.000  1.00  0.00           C  
+ATOM      3  C   ALA A   1       2.046   1.411   0.000  1.00  0.00           C  
+ATOM      4  O   ALA A   1       1.294   2.384   0.000  1.00  0.00           O  
+ATOM      5  CB  ALA A   1       2.089  -0.706  -1.206  1.00  0.00           C  
+ATOM      6  N   ALA A   2       3.357   1.496   0.000  1.00  0.00           N  
+ATOM      7  CA  ALA A   2       4.026   2.788   0.000  1.00  0.00           C  
+ATOM      8  C   ALA A   2       5.543   2.699   0.000  1.00  0.00           C  
+ATOM      9  O   ALA A   2       6.163   3.663   0.000  1.00  0.00           O  
+ATOM     10  CB  ALA A   2       3.604   3.596   1.211  1.00  0.00           C  
+TER
+ENDMDL

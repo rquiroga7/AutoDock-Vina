@@ -132,6 +132,11 @@ public:
         }
         return acc;
     };
+    fl eval_term(sz term_index, sz t1, sz t2, fl r) const{
+        if (term_index >= m_num_potentials) return 0.0;
+        return m_weights[term_index] * m_potentials[term_index]->eval(t1, t2, r);
+    };
+    sz get_num_potentials() const { return m_num_potentials; }
     fl conf_independent(const model& m, fl e) const{
         // Iterator for weights
         flv::const_iterator it = m_weights.begin() + m_num_potentials;

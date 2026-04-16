@@ -26,6 +26,7 @@
 #include "file.h"
 #include "curl.h"
 #include "precalculate.h"
+#include "non_cache.h"
 
 template<typename T>
 atom_range get_atom_range(const T& t) {
@@ -415,15 +416,17 @@ void model::assign_types() {
 
 		bool acceptor   = (a.ad == AD_TYPE_OA || a.ad == AD_TYPE_NA); // X-Score forumaltion apparently ignores SA
 		bool donor_NorO = (a.el == EL_TYPE_Met || bonded_to_HD(a));
+		bool het = false; // for debug
 
 		switch(a.el) {
 			case EL_TYPE_H    : break;
 			case EL_TYPE_C    :{
-                if     (a.ad == AD_TYPE_CG0){x = bonded_to_heteroatom(a) ? XS_TYPE_C_P_CG0 : XS_TYPE_C_H_CG0;}
-                else if(a.ad == AD_TYPE_CG1){x = bonded_to_heteroatom(a) ? XS_TYPE_C_P_CG1 : XS_TYPE_C_H_CG1;}
-                else if(a.ad == AD_TYPE_CG2){x = bonded_to_heteroatom(a) ? XS_TYPE_C_P_CG2 : XS_TYPE_C_H_CG2;}
-                else if(a.ad == AD_TYPE_CG3){x = bonded_to_heteroatom(a) ? XS_TYPE_C_P_CG3 : XS_TYPE_C_H_CG3;}
-                else                        {x = bonded_to_heteroatom(a) ? XS_TYPE_C_P : XS_TYPE_C_H;}
+				het = bonded_to_heteroatom(a);
+                if     (a.ad == AD_TYPE_CG0){x = het ? XS_TYPE_C_P_CG0 : XS_TYPE_C_H_CG0;}
+                else if(a.ad == AD_TYPE_CG1){x = het ? XS_TYPE_C_P_CG1 : XS_TYPE_C_H_CG1;}
+                else if(a.ad == AD_TYPE_CG2){x = het ? XS_TYPE_C_P_CG2 : XS_TYPE_C_H_CG2;}
+                else if(a.ad == AD_TYPE_CG3){x = het ? XS_TYPE_C_P_CG3 : XS_TYPE_C_H_CG3;}
+                else                        {x = het ? XS_TYPE_C_P : XS_TYPE_C_H;}
                 break;
             }
 			case EL_TYPE_N    : x = (acceptor && donor_NorO) ? XS_TYPE_N_DA : (acceptor ? XS_TYPE_N_A : (donor_NorO ? XS_TYPE_N_D : XS_TYPE_N_P)); break;
@@ -448,6 +451,17 @@ void model::assign_types() {
             }
 			case EL_TYPE_SIZE : break;
 			default: VINA_CHECK(false);
+		}
+		// DEBUG: print XS type for ligand atoms only
+		if(!ai.in_grid && a.el != EL_TYPE_H) {
+			const char* xs_names[] = {"C_H","C_P","N_P","N_D","N_A","N_DA","O_P","O_D","O_A","O_DA","S_P","P_P","F_H","Cl_H","Br_H","I_H","Si","At","Met_D","C_H_CG0","C_P_CG0","G0","C_H_CG1","C_P_CG1","G1","C_H_CG2","C_P_CG2","G2","C_H_CG3","C_P_CG3","G3","W"};
+			fprintf(stderr, "VINA_XS: atom[%zu] ad=%d xs=%s het=%d bonds=[", ai.i, (int)a.ad, (x < 32 ? xs_names[x] : "?"), het);
+			VINA_FOR_IN(bi, a.bonds) {
+				const bond& b = a.bonds[bi];
+				const atom& nb = get_atom(b.connected_atom_index);
+				fprintf(stderr, "%d(ad%d) ", (int)(b.connected_atom_index.in_grid ? -1 : (int)b.connected_atom_index.i), (int)nb.ad);
+			}
+			fprintf(stderr, "]\n");
 		}
 	}
 }
@@ -822,10 +836,154 @@ fl model::eval_inter(const precalculate_byatom& p, const vec& v) const { // clea
 	return e;
 }
 
+// Verbose energy evaluation - returns individual energy terms for intermolecular interactions
+std::vector<double> model::eval_inter_verbose(const ScoringFunction& sf, const vec& v) const {
+	std::vector<double> terms(sf.get_num_potentials(), 0.0);
+	fl cutoff_sqr = sf.get_cutoff() * sf.get_cutoff();
+	
+	VINA_FOR_IN(i, inter_pairs) {
+		const interacting_pair& ip = inter_pairs[i];
+		fl r2 = vec_distance_sqr(coords[ip.a], coords[ip.b]);
+		if(r2 < cutoff_sqr) {
+			fl r = std::sqrt(r2);
+			const atom& a = atoms[ip.a];
+			const atom& b = atoms[ip.b];
+			
+			// Evaluate each energy term separately
+			VINA_FOR(term_idx, sf.get_num_potentials()) {
+				terms[term_idx] += sf.eval_term(term_idx, a.xs, b.xs, r);
+			}
+		}
+	}
+	
+	return terms;
+}
+
+// Verbose energy evaluation including grid interactions
+// This evaluates all ligand-receptor atom pairs explicitly with term decomposition
+std::vector<double> model::eval_all_inter_verbose(const ScoringFunction& sf, const non_cache& nc, const vec& v) const {
+	std::vector<double> terms(sf.get_num_potentials(), 0.0);
+	fl cutoff_sqr = sf.get_cutoff() * sf.get_cutoff();
+	sz nat = num_atom_types(atom_type::XS);
+
+	// Evaluate inter_pairs (ligand-flex and ligand-ligand inter-molecular)
+	VINA_FOR_IN(i, inter_pairs) {
+		const interacting_pair& ip = inter_pairs[i];
+		fl r2 = vec_distance_sqr(coords[ip.a], coords[ip.b]);
+		if(r2 < cutoff_sqr) {
+			fl r = std::sqrt(r2);
+			const atom& a = atoms[ip.a];
+			const atom& b = atoms[ip.b];
+
+			VINA_FOR(term_idx, sf.get_num_potentials()) {
+				terms[term_idx] += sf.eval_term(term_idx, a.xs, b.xs, r);
+			}
+		}
+	}
+
+	// Evaluate ligand atoms against rigid receptor (grid_atoms)
+	// Ligand atoms are those in the ligands structure
+	// Use the spatial grid (sgrid) from non_cache to find receptor atoms within cutoff
+	VINA_FOR_IN(lig_idx, ligands) {
+		const ligand& lig = ligands[lig_idx];
+
+		// Iterate through ligand atoms
+		VINA_RANGE(atom_idx, lig.begin, lig.end) {
+			const atom& lig_atom = atoms[atom_idx];
+			const vec& lig_coords = coords[atom_idx];
+
+			// Get ligand atom type, handling special types like non_cache::eval does
+			sz t1 = lig_atom.get(atom_type::XS);
+			if(t1 >= nat) continue;
+			switch (t1) {
+				case XS_TYPE_G0:
+				case XS_TYPE_G1:
+				case XS_TYPE_G2:
+				case XS_TYPE_G3:
+					continue;  // Skip these
+				case XS_TYPE_C_H_CG0:
+				case XS_TYPE_C_H_CG1:
+				case XS_TYPE_C_H_CG2:
+				case XS_TYPE_C_H_CG3:
+					t1 = XS_TYPE_C_H;
+					break;
+				case XS_TYPE_C_P_CG0:
+				case XS_TYPE_C_P_CG1:
+				case XS_TYPE_C_P_CG2:
+				case XS_TYPE_C_P_CG3:
+					t1 = XS_TYPE_C_P;
+					break;
+			}
+
+			// Use spatial grid to find receptor atoms within cutoff (same as non_cache::eval)
+			const szv& possibilities = nc.get_sgrid().possibilities(lig_coords);
+
+			VINA_FOR_IN(possibilities_j, possibilities) {
+				const sz j = possibilities[possibilities_j];
+				const atom& rec_atom = grid_atoms[j];
+				
+				// Get receptor atom type, handling special types like non_cache::eval does
+				sz t2 = rec_atom.get(atom_type::XS);
+				if(t2 >= nat) continue;
+				switch (t2) {
+					case XS_TYPE_G0:
+					case XS_TYPE_G1:
+					case XS_TYPE_G2:
+					case XS_TYPE_G3:
+						continue;  // Skip these
+					case XS_TYPE_C_H_CG0:
+					case XS_TYPE_C_H_CG1:
+					case XS_TYPE_C_H_CG2:
+					case XS_TYPE_C_H_CG3:
+						t2 = XS_TYPE_C_H;
+						break;
+					case XS_TYPE_C_P_CG0:
+					case XS_TYPE_C_P_CG1:
+					case XS_TYPE_C_P_CG2:
+					case XS_TYPE_C_P_CG3:
+						t2 = XS_TYPE_C_P;
+						break;
+				}
+
+				fl r2 = vec_distance_sqr(lig_coords, rec_atom.coords);
+
+				if(r2 < cutoff_sqr) {
+					fl r = std::sqrt(r2);
+
+					VINA_FOR(term_idx, sf.get_num_potentials()) {
+						terms[term_idx] += sf.eval_term(term_idx, t1, t2, r);
+					}
+				}
+			}
+		}
+	}
+
+	return terms;
+}
+
 fl model::evali(const precalculate_byatom& p, const vec& v) const { // clean up
 	fl e = 0;
-	VINA_FOR_IN(i, ligands) 
+	VINA_FOR_IN(i, ligands) {
 		e += eval_interacting_pairs(p, v[0], ligands[i].pairs, coords); // probably might was well use coords here
+		// DEBUG: print intra pair details
+		{
+			fl cutoff_sqr = p.cutoff_sqr();
+			std::cerr << "INTRA_DEBUG: ligand " << i << " num_pairs=" << ligands[i].pairs.size() << " v[0]=" << v[0] << std::endl;
+			VINA_FOR_IN(j, ligands[i].pairs) {
+				const interacting_pair& ip = ligands[i].pairs[j];
+				fl r2 = vec_distance_sqr(coords[ip.a], coords[ip.b]);
+				if (r2 < cutoff_sqr) {
+					fl r = std::sqrt(r2);
+					fl tmp = p.eval_fast(ip.a, ip.b, r2);
+					fl raw = tmp;
+					curl(tmp, v[0]);
+					std::cerr << "INTRA_PAIR: " << ip.a << " " << ip.b
+					          << " xs=" << atoms[ip.a].xs << "," << atoms[ip.b].xs
+					          << " r=" << r << " raw=" << raw << " curled=" << tmp << std::endl;
+				}
+			}
+		}
+	}
 	return e;
 }
 

@@ -70,8 +70,9 @@ private:
 class Vina {
 public:
 	// Constructor
-	Vina(const std::string &sf_name="vina", int cpu=0, int seed=0, int verbosity=1, bool no_refine=false, std::function<void(double)>* progress_callback = NULL) {
+	Vina(const std::string &sf_name="vina", int cpu=0, int seed=0, int verbosity=1, bool no_refine=false, bool verbose=false, std::function<void(double)>* progress_callback = NULL) {
 		m_verbosity = verbosity;
+		m_verbose = verbose;
 		m_receptor_initialized = false;
 		m_ligand_initialized = false;
 		m_map_initialized = false;
@@ -174,6 +175,7 @@ private:
 	int m_seed;
 	// others
 	int m_verbosity;
+	bool m_verbose;
 	bool m_no_refine;
 	std::function<void(double)>* m_progress_callback;
 

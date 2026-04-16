@@ -150,6 +150,12 @@ public:
 	fl eval_inter(const precalculate_byatom& p,                  const vec& v           ) const;
 	fl eval_deriv(const precalculate_byatom& p, const igrid& ig, const vec& v, change& g);
 	fl eval_intramolecular(const precalculate_byatom& p, const igrid& ig, const vec& v);
+	
+	// Verbose energy evaluation - returns individual energy terms
+	std::vector<double> eval_inter_verbose(const class ScoringFunction& sf, const vec& v) const;
+	
+	// Verbose energy evaluation including grid interactions - returns individual energy terms for all intermolecular interactions
+	std::vector<double> eval_all_inter_verbose(const class ScoringFunction& sf, const class non_cache& nc, const vec& v) const;
 
 	fl rmsd_lower_bound(const model& m) const; // uses coords
 	fl rmsd_upper_bound(const model& m) const; // uses coords
